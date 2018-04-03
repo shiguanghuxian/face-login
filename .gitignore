@@ -15,5 +15,5 @@
 
 build/faceserver
 build/logs/*.log
-build/var/*
+build/var/*.pid
 build/config/config.toml.my

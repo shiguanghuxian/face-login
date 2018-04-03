@@ -1,0 +1,38 @@
+## 服务端配置文件
+
+## 是否调试
+debug = true
+
+## face++ api key
+api_key = ""
+api_secret = ""
+faceset_token = "" ## 一个faceset token，用于存储用户头像
+
+## http 监听
+[http]
+address = ""
+port = 8088
+
+
+## mysql 配置
+[mysql]
+## 是否调试模式
+debug = true
+## 数据库连接地址
+address = "127.0.0.1"
+## 数据库端口
+port = 3306
+## 连接池最大连接数
+max_idle_conns = 64
+## 默认打开连接数
+max_open_conns = 24
+## 数据库用户名
+user = "root"
+## 数据库密码
+passwd = "123456"
+## 数据库名
+db_name = "face"
+## 数据库表前缀
+prefix = "vivi_"
+## 定时保活定
+ping_interval = "30s"

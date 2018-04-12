@@ -8,6 +8,12 @@ api_key = ""
 api_secret = ""
 faceset_token = "" ## 一个faceset token，用于存储用户头像
 
+## 人脸识别类型
+face_type = "seeta" # face++ | seeta
+
+## 当face_type = "seeta"时的cmd命令位置,face所在目录
+cmd = "/Users/zuo/Documents/c++/SeetaFaceEngine/face/build/"
+
 ## http 监听
 [http]
 address = ""

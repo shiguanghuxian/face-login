@@ -1,6 +1,9 @@
 package common
 
 import (
+	"crypto/md5"
+	"encoding/hex"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -25,4 +28,19 @@ func WritePidToFile(filename string) error {
 // RemovePidFile 删除pid文件
 func RemovePidFile(filename string) error {
 	return os.Remove(GetRootDir() + "/var/" + filename + ".pid")
+}
+
+// GetFileMd5 获取文件md5值
+func GetFileMd5(picPath string) (string, error) {
+	// 获取文件md5
+	file, err := os.Open(picPath)
+	if err != nil {
+		return "", err
+	}
+	md5h := md5.New()
+	_, err = io.Copy(md5h, file)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(md5h.Sum(nil)), nil
 }

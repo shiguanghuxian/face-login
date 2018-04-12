@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"time"
 
 	"github.com/google/logger"
 	"github.com/labstack/echo"
@@ -31,6 +33,11 @@ func New() *FaceServer {
 	}
 	js, _ := json.Marshal(cfg)
 	log.Println(string(js))
+	// 初始化google/logger输出到文件
+	err = initLogger("faceserver", cfg.Debug)
+	if err != nil {
+		logger.Fatalln("日志初始化失败:", err)
+	}
 	// echo对象
 	e := echo.New()
 	e.Use(context.InitZContext())
@@ -73,4 +80,21 @@ func (fs *FaceServer) Run() {
 // Stop 停止服务
 func (fs *FaceServer) Stop() {
 
+}
+
+// 获取log文件对象
+func initLogger(name string, verbose bool) error {
+	rootPath := common.GetRootDir()
+	if rootPath != "" {
+		rootPath = fmt.Sprintf("%s%s", rootPath, string(os.PathSeparator))
+	}
+	logPath := fmt.Sprintf("%slogs%s%s_%d.log", rootPath, string(os.PathSeparator), name, time.Now().Unix())
+
+	lf, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660)
+	if err != nil {
+		return err
+	}
+	logger.Init(name, verbose, false, lf)
+
+	return nil
 }

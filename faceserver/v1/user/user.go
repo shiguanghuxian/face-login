@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	sdk "git.53it.net/face-golang-sdk"
 	"github.com/labstack/echo"
 	uuid "github.com/satori/go.uuid"
 	"github.com/shiguanghuxian/face-login/internal/common"
 	"github.com/shiguanghuxian/face-login/internal/config"
 	"github.com/shiguanghuxian/face-login/internal/db"
+	"github.com/shiguanghuxian/face-login/internal/face"
 	"github.com/shiguanghuxian/face-login/model"
 	"github.com/shiguanghuxian/logger"
 )
@@ -80,53 +80,44 @@ func (uc *UserController) AddUser(c echo.Context) error {
 	// 如果未添加到数据库，则删除图片
 	defer func() {
 		log.Println(user.Id)
-		if user.FaceToken == "" || user.Id == 0 {
-			os.Remove(picPath)
-		}
+		// if user.FaceToken == "" || user.Id == 0 {
+		// 	os.Remove(picPath)
+		// }
 	}()
 
-	// 上传脸部信息到face++
-	// faceset_token a6f362d1977068f590ebec924114cd39   d497255b9c0dddc971356e2552ce1c81
-	faceSDK, err := sdk.NewFaceSDK(config.CFG.APIKey, config.CFG.APISecret, config.CFG.Debug)
+	// 获取人脸数
+	var faceCount int = 0
+	var faceToken string = ""
+	if config.CFG.FaceType == "face++" {
+		faceCount, faceToken, err = face.GetFaceFaceCount(picPath)
+	} else if config.CFG.FaceType == "seeta" {
+		faceCount, faceToken, err = face.GetSeetaFaceCount(picPath)
+	} else {
+		return c.JSON(http.StatusBadRequest, "服务端未配置人脸检测方式")
+	}
+
 	if err != nil {
 		logger.Errorln(err)
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
-	// 人脸检测
-	detect, err := faceSDK.Detect()
-	if err != nil {
-		logger.Errorln(err)
-		return c.JSON(http.StatusBadRequest, err.Error())
-	}
-	dr, _, err := detect.SetImage(picPath, "image_file").End()
-	if err != nil {
-		logger.Errorln(err)
-		return c.JSON(http.StatusBadRequest, err.Error())
-	}
-	if len(dr.Faces) == 0 {
+	if faceCount == 0 {
 		return c.JSON(http.StatusBadRequest, "未检测到人脸信息")
 	}
-	if len(dr.Faces) > 1 {
+	if faceCount > 1 {
 		return c.JSON(http.StatusBadRequest, "请保证人脸照片中只包含一个人脸")
 	}
 
 	// 添加到faceset
-	faceSet, err := faceSDK.FaceSet(map[string]interface{}{
-		"faceset_token": config.CFG.FacesetToken,
-		"face_tokens":   dr.Faces[0].FaceToken,
-	})
-	if err != nil {
-		logger.Errorln(err)
-		return c.JSON(http.StatusBadRequest, err.Error())
+	if config.CFG.FaceType == "face++" {
+		_, err := face.AddFaceTokenToFaceSet(faceToken)
+		if err != nil {
+			logger.Errorln(err)
+			return c.JSON(http.StatusBadRequest, err.Error())
+		}
 	}
-	cr, _, err := faceSet.AddFace().End()
-	if err != nil {
-		logger.Errorln(err)
-		return c.JSON(http.StatusBadRequest, err.Error())
-	}
-	crData := cr.(*sdk.FaceSetAddFaceFaceResponse)
-	user.FaceToken = dr.Faces[0].FaceToken
-	user.FacesetToken = crData.FacesetToken
+
+	user.FaceToken = faceToken
+	user.FacesetToken = config.CFG.FacesetToken
 	user.CreateTime = time.Now().Unix()
 
 	err = db.DB.Create(user).Error
@@ -168,25 +159,14 @@ func (uc *UserController) DelUser(c echo.Context) error {
 	}
 
 	// 删除face++
-	faceSDK, err := sdk.NewFaceSDK(config.CFG.APIKey, config.CFG.APISecret, config.CFG.Debug)
-	if err != nil {
-		logger.Errorln(err)
-		return c.JSON(http.StatusBadRequest, err.Error())
+	if config.CFG.FaceType == "face++" {
+		err = face.RemoveFaceFace(user.FaceToken, user.FacesetToken)
+		if err != nil {
+			logger.Errorln(err)
+			return c.JSON(http.StatusBadRequest, err.Error())
+		}
 	}
-	faceSet, err := faceSDK.FaceSet()
-	if err != nil {
-		logger.Errorln(err)
-		return c.JSON(http.StatusBadRequest, err.Error())
-	}
-	_, b, err := faceSet.RemoveFace().SetOptionMap(map[string]interface{}{
-		"faceset_token": user.FacesetToken,
-		"face_tokens":   user.FaceToken,
-	}).End()
-	if err != nil {
-		logger.Errorln(err)
-		return c.JSON(http.StatusBadRequest, err.Error())
-	}
-	log.Println(b)
+
 	// 删除用户
 	err = db.DB.Where("id = ?", id).Delete(model.UserModel{}).Error
 	if err != nil {
@@ -209,25 +189,14 @@ func (uc *UserController) DelAll(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 	// 清空face_token
-	// 删除face++
-	faceSDK, err := sdk.NewFaceSDK(config.CFG.APIKey, config.CFG.APISecret, config.CFG.Debug)
-	if err != nil {
-		logger.Errorln(err)
-		return c.JSON(http.StatusBadRequest, err.Error())
+	if config.CFG.FaceType == "face++" {
+		err = face.RemoveFaceFace("RemoveAllFaceTokens", config.CFG.FacesetToken)
+		if err != nil {
+			logger.Errorln(err)
+			return c.JSON(http.StatusBadRequest, err.Error())
+		}
 	}
-	faceSet, err := faceSDK.FaceSet()
-	if err != nil {
-		logger.Errorln(err)
-		return c.JSON(http.StatusBadRequest, err.Error())
-	}
-	_, _, err = faceSet.RemoveFace().SetOptionMap(map[string]interface{}{
-		"faceset_token": config.CFG.FacesetToken,
-		"face_tokens":   "RemoveAllFaceTokens",
-	}).End()
-	if err != nil {
-		logger.Errorln(err)
-		return c.JSON(http.StatusBadRequest, err.Error())
-	}
+
 	// 删除所有图片
 	pathSeparator := string(os.PathSeparator)
 	picPath := fmt.Sprintf("%s%spublic%sfaces", common.GetRootDir(), pathSeparator, pathSeparator)

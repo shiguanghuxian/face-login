@@ -7,13 +7,13 @@ import (
 	"os"
 	"strings"
 
-	sdk "53it.net/face-golang-sdk"
 	"github.com/google/logger"
 	"github.com/labstack/echo"
 	uuid "github.com/satori/go.uuid"
 	"github.com/shiguanghuxian/face-login/internal/common"
 	"github.com/shiguanghuxian/face-login/internal/config"
 	"github.com/shiguanghuxian/face-login/internal/db"
+	"github.com/shiguanghuxian/face-login/internal/face"
 	"github.com/shiguanghuxian/face-login/model"
 )
 
@@ -63,34 +63,22 @@ func (pc *PublicController) Login(c echo.Context) error {
 	}
 
 	// 验证用户脸部信息
-	faceSDK, err := sdk.NewFaceSDK(config.CFG.APIKey, config.CFG.APISecret, config.CFG.Debug)
+	var faceToken string
+	if config.CFG.FaceType == "face++" {
+		faceToken, err = face.SearchFaceFaceToken(picPath)
+	} else if config.CFG.FaceType == "seeta" {
+		faceToken, err = face.SearchSeetaFaceToken(picPath)
+	} else {
+		return c.JSON(http.StatusBadRequest, "服务端未配置人脸检测方式")
+	}
 	if err != nil {
 		logger.Errorln(err)
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
-	search, err := faceSDK.Search()
-	if err != nil {
-		logger.Errorln(err)
-		return c.JSON(http.StatusBadRequest, err.Error())
-	}
-	r, _, err := search.SetFace(picPath, "image_file").
-		SetFaceSet(config.CFG.FacesetToken, "faceset_token").
-		SetOption("return_result_count", 1).End()
-	if err != nil {
-		logger.Errorln(err)
-		return c.JSON(http.StatusBadRequest, err.Error())
-	}
-	if len(r.Results) == 0 {
-		return c.JSON(http.StatusBadRequest, "用户不存在")
-	}
-	// 和万分之一做比较
-	e4 := r.Thresholds["1e-4"]
-	if r.Results[0].Confidence < e4 {
-		return c.JSON(http.StatusBadRequest, "未识别出用户")
-	}
+
 	// 查询用户信息
 	user := new(model.UserModel)
-	err = db.DB.Where("face_token = ?", r.Results[0].FaceToken).Limit(1).Find(user).Error
+	err = db.DB.Where("face_token = ?", faceToken).Limit(1).Find(user).Error
 	if err != nil {
 		logger.Errorln(err)
 		return c.JSON(http.StatusBadRequest, err.Error())

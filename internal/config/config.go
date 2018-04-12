@@ -19,6 +19,8 @@ type Config struct {
 	APIKey       string       `toml:"api_key"`
 	APISecret    string       `toml:"api_secret"`
 	FacesetToken string       `toml:"faceset_token"`
+	FaceType     string       `toml:"face_type"`
+	Cmd          string       `toml:"cmd"`
 	Http         *HTTPConfig  `toml:"http"`
 	MySQL        *MySQLConfig `toml:"mysql"`
 }

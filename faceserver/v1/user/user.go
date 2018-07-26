@@ -3,7 +3,6 @@ package user
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -79,10 +78,10 @@ func (uc *UserController) AddUser(c echo.Context) error {
 	user.FaceToken = ""
 	// 如果未添加到数据库，则删除图片
 	defer func() {
-		log.Println(user.Id)
-		// if user.FaceToken == "" || user.Id == 0 {
-		// 	os.Remove(picPath)
-		// }
+		// log.Println(user.Id)
+		if user.FaceToken == "" || user.Id == 0 {
+			os.Remove(picPath)
+		}
 	}()
 
 	// 获取人脸数
